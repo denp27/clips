@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dani Clips</title>
+<link rel="stylesheet" href="/assets/css/style.css" />
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<div class="container">
+  <h1 class="page-title">Dani Clips</h1>
+
+  <div class="card" id="hashtagCard" style="display:none;">
+    <div style="text-align:center;">
+      <div class="muted">Для публикации видео в TikTok</div>
+      <div class="muted">Вводи этот код в хэштеги под каждым своим видео</div>
+      <div style="font-size:22px;font-weight:700;margin:10px 0;" id="hashtagCode"></div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-cat="streamers" class="active">Стримеры</button>
+    <button data-cat="youtubers">Ютуберы</button>
+    <button data-cat="brands">Бренды</button>
+  </div>
+
+  <div id="offersList"></div>
+</div>
+
+<script src="/assets/js/app.js"></script>
+<script>
+let currentCategory = "streamers";
+
+function offerCard(o) {
+  const offerJson = encodeURIComponent(JSON.stringify(o));
+  return `
+    <div class="card" style="cursor:pointer;" onclick="openOfferDetails(JSON.parse(decodeURIComponent('${offerJson}')))">
+      ${o.image_url ? `<img class="offer-cover" src="${o.image_url}" />` : ""}
+      <div class="offer-row">
+        <div>
+          <div class="title">${o.title}</div>
+          <div class="channel">${o.channel}</div>
+        </div>
+        <div class="price-tag">${o.price} ₽ / 1000</div>
+      </div>
+      <div class="offer-meta-row">
+        <span class="meta-chip">👁 от ${o.min_views || 0} просмотров</span>
+      </div>
+      ${offerProgressHtml(o)}
+      <button class="btn btn-accent" style="margin-top:12px;" onclick="event.stopPropagation(); selectOffer(${o.id}, '${o.title.replace(/'/g, "")}')">Выбрать оффер</button>
+    </div>`;
+}
+
+window.selectOfferFromDetails = function (id, title) {
+  document.querySelectorAll(".details-overlay").forEach(el => el.remove());
+  selectOffer(id, title);
+};
+
+async function loadOffers(cat) {
+  currentCategory = cat;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.cat === cat));
+  const list = document.getElementById("offersList");
+  list.innerHTML = `<div class="muted" style="text-align:center;">Загрузка...</div>`;
+  try {
+    const offers = await api(`/api/offers?category=${cat}`);
+    if (!offers.length) {
+      list.innerHTML = `<div class="empty-state">Нет доступных офферов</div>`;
+      return;
+    }
+    list.innerHTML = offers.map(offerCard).join("");
+  } catch (e) {
+    list.innerHTML = `<div class="empty-state">Ошибка загрузки: ${e.message}</div>`;
+  }
+}
+
+function selectOffer(id, title) {
+  localStorage.setItem("selectedOfferId", id);
+  localStorage.setItem("selectedOfferTitle", title);
+  showToast(`Оффер «${title}» выбран`);
+  setTimeout(() => { window.location.href = "/clips.html"; }, 600);
+}
+
+document.querySelectorAll("#tabs button").forEach(btn => {
+  btn.addEventListener("click", () => loadOffers(btn.dataset.cat));
+});
+
+(async () => {
+  const me = await maybeShowAdminLink();
+  await loadOffers(currentCategory);
+})();
+
+renderBottomNav("index");
+</script>
+</body>
+</html>
